@@ -1,0 +1,13 @@
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+DB_USER = "pagagal_dshome"
+DB_PASS = "1Borabora@#"
+DB_HOST = "localhost"
+DB_NAME = "pagagal_dshome"
+
+DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}?charset=utf8mb4"
+
+engine = create_engine(DATABASE_URL, echo=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
