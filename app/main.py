@@ -1,9 +1,19 @@
 from fastapi import FastAPI, Depends
-from app.db import Base, engine, get_db
+from fastapi.middleware.cors import CORSMiddleware
+from app.db import Base, engine
 from app.models import User
 from app.auth import get_current_user
 
 app = FastAPI()
+
+# Позволи заявки от всички адреси (или само от твоите)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Може да сложиш само твоя домейн/IP за по-голяма сигурност
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 Base.metadata.create_all(bind=engine)
 
