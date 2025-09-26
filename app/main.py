@@ -1,22 +1,57 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db import Base, engine, get_db
 from app.models import User
 from app.schemas import UserCreate, UserOut, Token
 from app.auth import get_current_user, get_password_hash, authenticate_user, create_access_token
 
-app = FastAPI()
+app = FastAPI(
+    title="FastAPI",
+    description="API с Bearer Token authentication в Swagger UI",
+    version="0.1.0"
+)
 
+# CORS настройки
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Ограничете за повече сигурност
+    allow_origins=["*"],  # Ограничете по нужда!
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 Base.metadata.create_all(bind=engine)
+
+# Bearer token security scheme за Swagger/OpenAPI
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        }
+    }
+    # Добавяме security към всеки защитен endpoint
+    for path in openapi_schema["paths"]:
+        for method in openapi_schema["paths"][path]:
+            if path == "/me":  # само /me е защитен
+                openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 @app.post("/register", response_model=UserOut)
 def register(user: UserCreate, db: Session = Depends(get_db)):
