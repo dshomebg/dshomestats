@@ -1,12 +1,12 @@
-from sqlalchemy import Column, Integer
+from sqlalchemy import Column, Integer, String
 from app.db import Base
 
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(Integer, unique=True, index=True)
-    hashed_password = Column(Integer)
-    is_admin = Column(Integer)
+    username = Column(String(64), unique=True, index=True)
+    hashed_password = Column(String(128))
+    is_admin = Column(Integer, default=0)
 
 class Traffic(Base):
     __tablename__ = "traffic"
