@@ -30,5 +30,5 @@ class TrafficAdmin(ModelView, model=Traffic):
 
 admin.add_view(UserAdmin)
 admin.add_view(TrafficAdmin)
-
+admin.add_view(TrafficImportView)
 # Останалите твои endpoint-и могат да си стоят както са били
