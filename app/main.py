@@ -3,7 +3,7 @@ from sqladmin import Admin, ModelView
 
 from app.db import engine
 from app.models import User, Traffic
-
+from app.admin_import import TrafficImportView
 app = FastAPI(
     title="Traffic API",
     description="Модул за трафик с пера по месеци и години",
