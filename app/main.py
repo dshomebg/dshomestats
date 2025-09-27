@@ -1,6 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db import Base, engine, get_db
 from app.models import User
@@ -9,14 +8,13 @@ from app.auth import get_current_user, get_password_hash, authenticate_user, cre
 
 app = FastAPI(
     title="FastAPI",
-    description="API с Bearer Token authentication в Swagger UI",
-    version="0.1.0"
+    description="Само 1 админ и 1 юзер, без регистрация.",
+    version="0.1.1"
 )
 
-# CORS настройки
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Ограничете по нужда!
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,49 +22,34 @@ app.add_middleware(
 
 Base.metadata.create_all(bind=engine)
 
-# Bearer token security scheme за Swagger/OpenAPI
-from fastapi.openapi.utils import get_openapi
+# --- Initial users (admin and user) ---
+def create_initial_users():
+    db = next(get_db())
+    admin = db.query(User).filter(User.username == "admin").first()
+    user = db.query(User).filter(User.username == "user").first()
+    changed = False
+    if not admin:
+        admin = User(
+            username="admin",
+            hashed_password=get_password_hash("admin123"),
+            is_admin=True
+        )
+        db.add(admin)
+        changed = True
+    if not user:
+        user = User(
+            username="user",
+            hashed_password=get_password_hash("user123"),
+            is_admin=False
+        )
+        db.add(user)
+        changed = True
+    if changed:
+        db.commit()
 
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-    )
-    openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT"
-        }
-    }
-    # Добавяме security към всеки защитен endpoint
-    for path in openapi_schema["paths"]:
-        for method in openapi_schema["paths"][path]:
-            if path == "/me":  # само /me е защитен
-                openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
+create_initial_users()
 
-app.openapi = custom_openapi
-
-@app.post("/register", response_model=UserOut)
-def register(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == user.username).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    new_user = User(
-        username=user.username,
-        hashed_password=get_password_hash(user.password)
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
-
+# --- Login endpoint ---
 @app.post("/login", response_model=Token)
 def login(user: UserCreate, db: Session = Depends(get_db)):
     db_user = authenticate_user(db, user.username, user.password)
@@ -75,6 +58,14 @@ def login(user: UserCreate, db: Session = Depends(get_db)):
     access_token = create_access_token(data={"sub": db_user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+# --- Public endpoint (everyone can access) ---
 @app.get("/me", response_model=UserOut)
 def read_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+# --- Admin-only endpoint example ---
+@app.get("/admin/users", response_model=list[UserOut])
+def list_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only!")
+    return db.query(User).all()
