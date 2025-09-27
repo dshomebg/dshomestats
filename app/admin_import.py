@@ -10,7 +10,7 @@ import tempfile
 class TrafficImportView(BaseView):
     name = "Импорт на трафик"
     icon = "fa fa-upload"
-    slug = "traffic-import"
+    slug = "trafficimport"
 
     @expose("/", methods=["GET", "POST"])
     async def import_traffic(self, request: Request):
