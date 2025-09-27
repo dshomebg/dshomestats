@@ -51,7 +51,7 @@ class TrafficImportView(BaseView):
             html = f"""
                 <h3>Преглед на първия ред:</h3>
                 {preview}
-                <form action="/admin/traffic-import/process" method="post">
+                <form action="/admin/trafficimport/process" method="post">
                 {mapping_form}
                 <button type="submit">Импорт</button>
                 </form>
