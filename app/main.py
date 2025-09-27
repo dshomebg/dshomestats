@@ -1,41 +1,34 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
-from app.db import Base, engine, get_db
+from fastapi import FastAPI
+from sqladmin import Admin, ModelView
+
+from app.db import engine
 from app.models import User, Traffic
-from app.schemas import UserOut, TrafficCreate, TrafficOut
-from app.auth import get_current_user
 
 app = FastAPI(
     title="Traffic API",
     description="Модул за трафик с пера по месеци и години",
-    version="0.1.0"
+    version="0.2.0"
 )
 
-Base.metadata.create_all(bind=engine)
+# SQLAdmin setup:
+admin = Admin(app, engine)
 
-@app.post("/traffic", response_model=TrafficOut)
-def upsert_traffic(item: TrafficCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if not user.is_admin:
-        raise HTTPException(403, "Admins only")
-    traffic = db.query(Traffic).filter(Traffic.year==item.year, Traffic.month==item.month).first()
-    if not traffic:
-        traffic = Traffic(**item.dict())
-        db.add(traffic)
-    else:
-        for key, value in item.dict().items():
-            setattr(traffic, key, value)
-    db.commit()
-    db.refresh(traffic)
-    return traffic
+class UserAdmin(ModelView, model=User):
+    column_list = [User.id, User.username, User.is_admin]
+    name = "User"
+    name_plural = "Users"
+    icon = "fa-solid fa-user"
 
-@app.get("/traffic", response_model=TrafficOut)
-def get_traffic(year: int, month: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    traffic = db.query(Traffic).filter(Traffic.year==year, Traffic.month==month).first()
-    if not traffic:
-        raise HTTPException(404, "No data for this period")
-    return traffic
+class TrafficAdmin(ModelView, model=Traffic):
+    column_list = [
+        Traffic.id, Traffic.year, Traffic.month, Traffic.organic, Traffic.brand,
+        Traffic.facebook, Traffic.facebook_paid, Traffic.google_paid, Traffic.other
+    ]
+    name = "Traffic"
+    name_plural = "Traffic"
+    icon = "fa-solid fa-chart-line"
 
-@app.get("/traffic/all", response_model=List[TrafficOut])
-def get_all_traffic(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return db.query(Traffic).order_by(Traffic.year, Traffic.month).all()
+admin.add_view(UserAdmin)
+admin.add_view(TrafficAdmin)
+
+# Останалите твои endpoint-и могат да си стоят както са били
