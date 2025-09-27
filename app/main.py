@@ -1,101 +1,41 @@
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 from app.db import Base, engine, get_db
-from app.models import User
-from app.schemas import UserCreate, UserOut, Token
-from app.auth import get_current_user, get_password_hash, authenticate_user, create_access_token
+from app.models import User, Traffic
+from app.schemas import UserOut, TrafficCreate, TrafficOut
+from app.auth import get_current_user
 
 app = FastAPI(
-    title="FastAPI",
-    description="Само 1 админ и 1 юзер, без регистрация.",
-    version="0.1.1"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    title="Traffic API",
+    description="Модул за трафик с пера по месеци и години",
+    version="0.1.0"
 )
 
 Base.metadata.create_all(bind=engine)
 
-# --- Initial users (admin and user) ---
-def create_initial_users():
-    db = next(get_db())
-    admin = db.query(User).filter(User.username == "admin").first()
-    user = db.query(User).filter(User.username == "user").first()
-    changed = False
-    if not admin:
-        admin = User(
-            username="admin",
-            hashed_password=get_password_hash("admin123"),
-            is_admin=True
-        )
-        db.add(admin)
-        changed = True
-    if not user:
-        user = User(
-            username="user",
-            hashed_password=get_password_hash("user123"),
-            is_admin=False
-        )
-        db.add(user)
-        changed = True
-    if changed:
-        db.commit()
+@app.post("/traffic", response_model=TrafficOut)
+def upsert_traffic(item: TrafficCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    if not user.is_admin:
+        raise HTTPException(403, "Admins only")
+    traffic = db.query(Traffic).filter(Traffic.year==item.year, Traffic.month==item.month).first()
+    if not traffic:
+        traffic = Traffic(**item.dict())
+        db.add(traffic)
+    else:
+        for key, value in item.dict().items():
+            setattr(traffic, key, value)
+    db.commit()
+    db.refresh(traffic)
+    return traffic
 
-create_initial_users()
+@app.get("/traffic", response_model=TrafficOut)
+def get_traffic(year: int, month: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    traffic = db.query(Traffic).filter(Traffic.year==year, Traffic.month==month).first()
+    if not traffic:
+        raise HTTPException(404, "No data for this period")
+    return traffic
 
-# --- Bearer token security scheme for Swagger/OpenAPI ---
-from fastapi.openapi.utils import get_openapi
-
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-    )
-    openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT"
-        }
-    }
-    # Добавяме security към защитените endpoint-и
-    for path in openapi_schema["paths"]:
-        for method in openapi_schema["paths"][path]:
-            if path == "/me" or path == "/admin/users":
-                openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-app.openapi = custom_openapi
-
-# --- Login endpoint ---
-@app.post("/login", response_model=Token)
-def login(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = authenticate_user(db, user.username, user.password)
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-    access_token = create_access_token(data={"sub": db_user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-# --- Public endpoint (everyone can access) ---
-@app.get("/me", response_model=UserOut)
-def read_me(current_user: User = Depends(get_current_user)):
-    return current_user
-
-# --- Admin-only endpoint example ---
-@app.get("/admin/users", response_model=List[UserOut])
-def list_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if not current_user.is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only!")
-    return db.query(User).all()
+@app.get("/traffic/all", response_model=List[TrafficOut])
+def get_all_traffic(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return db.query(Traffic).order_by(Traffic.year, Traffic.month).all()
