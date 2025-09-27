@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from typing import List
 from app.db import Base, engine, get_db
 from app.models import User
 from app.schemas import UserCreate, UserOut, Token
@@ -49,6 +50,35 @@ def create_initial_users():
 
 create_initial_users()
 
+# --- Bearer token security scheme for Swagger/OpenAPI ---
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        }
+    }
+    # Добавяме security към защитените endpoint-и
+    for path in openapi_schema["paths"]:
+        for method in openapi_schema["paths"][path]:
+            if path == "/me" or path == "/admin/users":
+                openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
 # --- Login endpoint ---
 @app.post("/login", response_model=Token)
 def login(user: UserCreate, db: Session = Depends(get_db)):
@@ -64,7 +94,7 @@ def read_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 # --- Admin-only endpoint example ---
-@app.get("/admin/users", response_model=list[UserOut])
+@app.get("/admin/users", response_model=List[UserOut])
 def list_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only!")
