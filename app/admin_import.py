@@ -4,7 +4,7 @@ from starlette.responses import HTMLResponse
 class TrafficImportView(BaseView):
     name = "Импорт на трафик"
     icon = "fa fa-upload"
-    slug = "trafficimport"  # slug-а определя URL-а: /admin/trafficimport/
+    slug = "trafficimport"
 
     @expose("/", methods=["GET"])
     async def import_traffic(self, request):
