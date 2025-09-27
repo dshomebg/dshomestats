@@ -32,7 +32,6 @@ class TrafficImportView(BaseView):
             finally:
                 os.remove(tmp_path)
 
-            # Показваме колоните и първия ред за преглед
             columns = df.columns.tolist()
             preview = df.head(1).to_html(index=False)
             mapping_fields = [
