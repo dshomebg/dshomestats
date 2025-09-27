@@ -3,7 +3,7 @@ from sqladmin import Admin, ModelView
 
 from app.db import engine
 from app.models import User, Traffic
-from app.admin_import import TrafficImportView  # <-- това е важно
+from app.admin_import import TrafficImportView
 
 app = FastAPI(
     title="Traffic API",
@@ -30,4 +30,4 @@ class TrafficAdmin(ModelView, model=Traffic):
 
 admin.add_view(UserAdmin)
 admin.add_view(TrafficAdmin)
-admin.add_view(TrafficImportView)  # <-- това е важно
+admin.add_view(TrafficImportView)
