@@ -10,6 +10,7 @@ import tempfile
 class TrafficImportView(BaseView):
     name = "Импорт на трафик"
     icon = "fa fa-upload"
+    slug = "traffic-import"
 
     @expose("/", methods=["GET", "POST"])
     async def import_traffic(self, request: Request):
@@ -45,8 +46,7 @@ class TrafficImportView(BaseView):
                 for field in mapping_fields
             )
 
-            # Запази файла временно за втория POST
-            df.to_csv(f"/tmp/traffic_import.csv", index=False)
+            df.to_csv("/tmp/traffic_import.csv", index=False)
 
             html = f"""
                 <h3>Преглед на първия ред:</h3>
